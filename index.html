@@ -432,20 +432,24 @@
     }
 
     function suggestSpelling(word) {
-      const maxSuggestions = 3;
-      const maxDistance = 2;
-      const w = word.toLowerCase();
-      const candidates = [];
-      DICTIONARY_WORDS.forEach(dictWord => {
-        if (Math.abs(dictWord.length - w.length) > 2) return;
-        const d = levenshtein(w, dictWord);
-        if (d <= maxDistance) {
-          candidates.push({ word: dictWord, dist: d });
-        }
-      });
-      candidates.sort((a, b) => a.dist - b.dist || a.word.localeCompare(b.word));
-      return candidates.slice(0, maxSuggestions).map(c => c.word);
+  const w = word.toLowerCase();
+  const maxSuggestions = 3;
+
+  const candidates = [];
+  DICTIONARY_WORDS.forEach(dictWord => {
+    // Only consider words with very similar length
+    if (Math.abs(dictWord.length - w.length) > 1) return;
+
+    const d = levenshtein(w, dictWord);
+    // We only care about *very* close matches (distance = 1)
+    if (d === 1) {
+      candidates.push(dictWord);
     }
+  });
+
+  // Return up to 3 closest options
+  return candidates.slice(0, maxSuggestions);
+}
 
     // ---------- BASE FEEDBACK (capital / punctuation / pattern + spelling) ----------
 
@@ -1577,4 +1581,5 @@ tokens.forEach((tok, tIndex) => {
   </script>
 </body>
 </html>
+
 
