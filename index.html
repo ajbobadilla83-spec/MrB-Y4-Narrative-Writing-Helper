@@ -341,117 +341,64 @@
       }
     }
 
-    // ---------- SPELLING SUPPORT (dictionary + Levenshtein) ----------
+    // ---------- SIMPLE TARGETED SPELLING CHECK ----------
 
-    const DICTIONARY_WORDS = [
-      // High-frequency function words
-      "a","about","above","after","again","all","almost","along","also","always","am","an","and","another","any",
-      "are","around","as","at","back","because","been","before","being","below","between","both","but","by","can",
-      "could","did","do","does","doing","down","during","each","else","even","ever","every","few","for","from","had",
-      "has","have","having","he","her","here","hers","herself","him","himself","his","how","i","if","in","into","is",
-      "it","its","itself","just","like","made","make","many","may","me","might","more","most","much","must","my",
-      "myself","no","not","now","of","off","on","once","one","only","or","other","our","ours","ourselves","out","over",
-      "own","said","same","she","should","so","some","such","than","that","the","their","theirs","them","themselves",
-      "then","there","these","they","this","those","through","to","too","under","up","very","was","we","were","what",
-      "when","where","which","while","who","whom","why","will","with","within","without","would","you","your","yours",
-      "yourself","yourselves",
-
-      // Common narrative nouns & verbs & adjectives
-      "boy","girl","child","teacher","student","class","school","hallway","corridor","classroom","playground","field",
-      "oval","park","forest","village","city","street","road","bridge","river","lake","ocean","sea","space","planet",
-      "moon","star","ship","spaceship","pod","robot","door","window","floor","ceiling","wall","desk","chair","light",
-      "shadow","noise","sound","voice","footsteps","wind","rain","storm","cloud","clouds","thunder","lightning",
-      "danger","problem","mystery","secret","clue","footprint","footprints","note","message","alarm","engine","button",
-      "panel","screen","smoke","fog","dust","fire","flame","flames","heart","eyes","hands","face","head","feet",
-
-      "run","ran","walk","walked","creep","crept","step","stepped","turn","turned","look","looked","glance","glanced",
-      "whisper","whispered","shout","shouted","exclaim","exclaimed","hurry","hurried","dash","dashed","stomp","stomped",
-      "glimpse","glimpsed","witness","witnessed","see","saw","seen","hear","heard","smell","smelt","smelled","taste",
-      "tasted","feel","felt","touch","touched","grab","grabbed","pull","pulled","push","pushed","slam","slammed",
-      "shake","shook","rattle","rattled","lurch","lurched","blink","blinked","flicker","flickered","drift","drifted",
-      "float","floated","fall","fell","fallen","rise","rose","risen","jump","jumped","leap","leapt","open","opened",
-      "close","closed","climb","climbed","hide","hid","hidden","search","searched","follow","followed","listen",
-      "listened","wait","waited","watch","watched","think","thought","wonder","wondered","hope","hoped","fear","feared",
-      "know","knew","realise","realised","realize","realized","breathe","breathed","speak","spoke","said",
-
-      "big","small","tiny","huge","massive","narrow","wide","dark","darker","darkest","bright","brighter","brightest",
-      "loud","louder","loudest","quiet","quieter","quietest","silent","cold","colder","coldest","hot","hotter","hottest",
-      "warm","warmer","warmest","strange","weird","odd","normal","usual","unusual","mysterious","eerie","creepy",
-      "frantic","gloomy","thunderous","dazzling","calm","peaceful","noisy","crowded","empty","nervous","scared",
-      "afraid","terrified","worried","anxious","curious","determined","cautious","brave","shy","sneaky","bossy",
-      "forgetful","hilarious","angry","furious","relieved","hopeful","excited","tired","exhausted","proud","thankful",
-
-      // Aussie / school spelling variants likely to appear
-      "colour","favorite","favourite","centre","center","neighbour","neighbor","maths","numeracy","library","office",
-      "principal","teacher","assistant","perth","australia","australian",
-
-      // Some narrative connectors
-      "suddenly","slowly","carefully","quietly","quickly","softly","sharply","gently","finally","afterward","afterwards",
-      "earlier","later","before","instead","meanwhile","inside","outside","nearby","everywhere","somewhere","nowhere",
-      "today","tonight","yesterday","tomorrow","morning","afternoon","evening","midnight"
-    ];
-
-    const DICTIONARY = new Set(DICTIONARY_WORDS);
+    // Words we *know* are often misspelt in Year 4 writing
+    const COMMON_MISSPELLINGS = {
+      mistery: "mystery",
+      mistry: "mystery",
+      spasehip: "spaceship",
+      spaseship: "spaceship",
+      becuase: "because",
+      becasue: "because",
+      thier: "their",
+      freind: "friend",
+      frend: "friend",
+      realy: "really",
+      finaly: "finally",
+      sudenly: "suddenly",
+      suddently: "suddenly",
+      everyting: "everything",
+      evrything: "everything",
+      somthing: "something",
+      someting: "something",
+      beleive: "believe",
+      belive: "believe",
+      charcter: "character",
+      charecter: "character",
+      speical: "special",
+      definetly: "definitely",
+      definitly: "definitely",
+      alway: "always",
+      allways: "always"
+    };
 
     function normaliseWord(raw) {
       if (!raw) return "";
-      const cleaned = raw
+      return raw
         .replace(/^[^a-zA-Z']+/, "")
         .replace(/[^a-zA-Z']+$/, "")
         .toLowerCase();
-      return cleaned;
     }
 
-    function isLikelyWord(token) {
-      if (!token) return false;
-      if (token.length < 2) return false;
-      if (/^\d+$/.test(token)) return false;
-      return true;
-    }
+    function addSpellingFeedback(sentence, feedback) {
+      const tokens = sentence.split(/\s+/);
+      const seen = new Set();
 
-    // Simple Levenshtein distance
-    function levenshtein(a, b) {
-      const m = a.length;
-      const n = b.length;
-      if (m === 0) return n;
-      if (n === 0) return m;
-      const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-      for (let i = 0; i <= m; i++) dp[i][0] = i;
-      for (let j = 0; j <= n; j++) dp[0][j] = j;
-      for (let i = 1; i <= m; i++) {
-        for (let j = 1; j <= n; j++) {
-          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-          dp[i][j] = Math.min(
-            dp[i - 1][j] + 1,
-            dp[i][j - 1] + 1,
-            dp[i - 1][j - 1] + cost
-          );
+      tokens.forEach(tok => {
+        const core = normaliseWord(tok);
+        if (!core) return;
+        if (seen.has(core)) return;
+        seen.add(core);
+
+        const correction = COMMON_MISSPELLINGS[core];
+        if (correction) {
+          feedback.push(`⚠️ "${core}" is probably spelled "${correction}".`);
         }
-      }
-      return dp[m][n];
+      });
     }
 
-    function suggestSpelling(word) {
-  const w = word.toLowerCase();
-  const maxSuggestions = 3;
-
-  const candidates = [];
-  DICTIONARY_WORDS.forEach(dictWord => {
-    // Only consider words with very similar length
-    if (Math.abs(dictWord.length - w.length) > 1) return;
-
-    const d = levenshtein(w, dictWord);
-    // We only care about *very* close matches (distance = 1)
-    if (d === 1) {
-      candidates.push(dictWord);
-    }
-  });
-
-  // Return up to 3 closest options
-  return candidates.slice(0, maxSuggestions);
-}
-
-    // ---------- BASE FEEDBACK (capital / punctuation / pattern + spelling) ----------
+    // ---------- BASE FEEDBACK (capital / punctuation / pattern + targeted spelling) ----------
 
     function grammarChecks(sentence, idx) {
       const feedback = [];
@@ -488,32 +435,8 @@
         feedback.push("💡 Sentence 4 can show thoughts, feelings or dialogue. Can you show what the character says or thinks?");
       }
 
-     // SPELLING CHECK (gentler)
-const tokens = trimmed.split(/\s+/);
-const seenMisses = new Set();
-tokens.forEach((tok, tIndex) => {
-  const core = normaliseWord(tok);
-  if (!isLikelyWord(core)) return;
-
-  // Skip likely proper nouns (capitalised, not first word)
-  const original = tok.replace(/^[^A-Za-z']+/, "");
-  if (/^[A-Z]/.test(original) && tIndex > 0) return;
-
-  // If the word is not in our dictionary, we *only*
-  // flag it when there is a very close suggestion.
-  if (!DICTIONARY.has(core)) {
-    if (seenMisses.has(core)) return;
-    const suggestions = suggestSpelling(core);
-    if (suggestions.length > 0) {
-      seenMisses.add(core);
-      feedback.push(
-        `⚠️ "${core}" may be misspelled. Did you mean: ${suggestions.join(", ")}?`
-      );
-    }
-    // If there are no good suggestions, stay quiet and
-    // let the iPad's spellchecker handle it.
-  }
-});
+      // NEW: targeted spelling feedback for common mistakes only
+      addSpellingFeedback(trimmed, feedback);
 
       return feedback;
     }
@@ -1581,5 +1504,3 @@ tokens.forEach((tok, tIndex) => {
   </script>
 </body>
 </html>
-
-
