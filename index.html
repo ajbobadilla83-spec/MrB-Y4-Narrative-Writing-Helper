@@ -484,27 +484,32 @@
         feedback.push("💡 Sentence 4 can show thoughts, feelings or dialogue. Can you show what the character says or thinks?");
       }
 
-      // SPELLING CHECK
-      const tokens = trimmed.split(/\s+/);
-      const seenMisses = new Set();
-      tokens.forEach((tok, tIndex) => {
-        const core = normaliseWord(tok);
-        if (!isLikelyWord(core)) return;
+     // SPELLING CHECK (gentler)
+const tokens = trimmed.split(/\s+/);
+const seenMisses = new Set();
+tokens.forEach((tok, tIndex) => {
+  const core = normaliseWord(tok);
+  if (!isLikelyWord(core)) return;
 
-        const original = tok.replace(/^[^A-Za-z']+/, "");
-        if (/^[A-Z]/.test(original) && tIndex > 0) return;
+  // Skip likely proper nouns (capitalised, not first word)
+  const original = tok.replace(/^[^A-Za-z']+/, "");
+  if (/^[A-Z]/.test(original) && tIndex > 0) return;
 
-        if (!DICTIONARY.has(core)) {
-          if (seenMisses.has(core)) return;
-          seenMisses.add(core);
-          const suggestions = suggestSpelling(core);
-          if (suggestions.length > 0) {
-            feedback.push(`⚠️ "${core}" may be misspelled. Did you mean: ${suggestions.join(", ")}?`);
-          } else {
-            feedback.push(`⚠️ "${core}" may be misspelled. Check this word carefully.`);
-          }
-        }
-      });
+  // If the word is not in our dictionary, we *only*
+  // flag it when there is a very close suggestion.
+  if (!DICTIONARY.has(core)) {
+    if (seenMisses.has(core)) return;
+    const suggestions = suggestSpelling(core);
+    if (suggestions.length > 0) {
+      seenMisses.add(core);
+      feedback.push(
+        `⚠️ "${core}" may be misspelled. Did you mean: ${suggestions.join(", ")}?`
+      );
+    }
+    // If there are no good suggestions, stay quiet and
+    // let the iPad's spellchecker handle it.
+  }
+});
 
       return feedback;
     }
@@ -1572,3 +1577,4 @@
   </script>
 </body>
 </html>
+
